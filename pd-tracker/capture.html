@@ -71,9 +71,9 @@
       </div>
 
       <div id="submit-error"></div>
-      <div id="submit-success"></div>
       <button type="button" class="btn btn-primary btn-block" style="margin-top:20px" id="submit-btn" onclick="submitEntry()">Submit entry</button>
     </form>
+    <div id="submit-success"></div>
   </div>
 
   <div class="card">
@@ -232,7 +232,12 @@ function resetForm() {
   document.getElementById("title").value = "";
   document.getElementById("contact-name").value = "";
   document.getElementById("transcript").value = "";
+  document.getElementById("entry-date").value = new Date().toISOString().slice(0, 10);
   clearPhoto();
+
+  selectedType = null;
+  document.querySelectorAll(".type-card").forEach((el) => el.classList.remove("active"));
+  document.getElementById("entry-form").style.display = "none";
 }
 
 function showSubmitMessage(message, isError, isSuccess) {
