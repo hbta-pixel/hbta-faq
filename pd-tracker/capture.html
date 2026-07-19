@@ -38,7 +38,10 @@
 
     <form id="entry-form" style="display:none">
       <label for="title">Title / what it was</label>
-      <input type="text" id="title" placeholder="e.g. Assessment Validation Webinar">
+      <div class="mic-row">
+        <button type="button" class="mic-btn mic-btn-sm" id="title-mic-btn">🎤</button>
+        <input type="text" id="title" placeholder="e.g. Assessment Validation Webinar" style="flex:1">
+      </div>
 
       <div id="contact-field" style="display:none">
         <label for="contact-name">Who did you speak with / engage with?</label>
@@ -50,7 +53,7 @@
 
       <label for="transcript">Talk it through (or type)</label>
       <div class="mic-row">
-        <button type="button" class="mic-btn" id="mic-btn" onclick="toggleMic()">🎤</button>
+        <button type="button" class="mic-btn" id="mic-btn">🎤</button>
         <span class="mic-status" id="mic-status">Tap the mic and speak — you can edit the text after.</span>
       </div>
       <textarea id="transcript" placeholder="What did you take away from it? What was covered / discussed?" style="margin-top:10px"></textarea>
@@ -87,8 +90,6 @@
 let profileCtx = null;
 let selectedType = null;
 let selectedPhotoFile = null;
-let recognition = null;
-let recognizing = false;
 
 function selectType(type) {
   selectedType = type;
@@ -116,23 +117,30 @@ function clearPhoto() {
   document.getElementById("photo-preview-row").style.display = "none";
 }
 
-function setupSpeechRecognition() {
+// Wires a mic button to dictate into a text input/textarea. Works for any
+// field — used for both the title and the main transcript.
+function setupDictation(fieldId, buttonId, statusId, idleStatusText) {
+  const field = document.getElementById(fieldId);
+  const btn = document.getElementById(buttonId);
+  const statusEl = statusId ? document.getElementById(statusId) : null;
+
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
-    document.getElementById("mic-status").textContent =
-      "Voice input isn't supported in this browser — just type instead.";
-    document.getElementById("mic-btn").disabled = true;
+    if (statusEl) statusEl.textContent = "Voice input isn't supported in this browser — just type instead.";
+    btn.disabled = true;
     return;
   }
-  recognition = new SR();
+
+  const recognition = new SR();
   recognition.continuous = true;
   recognition.interimResults = true;
   recognition.lang = "en-AU";
 
   let baseText = "";
+  let listening = false;
 
   recognition.onstart = () => {
-    baseText = document.getElementById("transcript").value;
+    baseText = field.value;
     if (baseText && !baseText.endsWith(" ")) baseText += " ";
   };
 
@@ -145,37 +153,33 @@ function setupSpeechRecognition() {
       else interimText += chunk;
     }
     if (finalText) baseText += finalText;
-    document.getElementById("transcript").value = baseText + interimText;
+    field.value = baseText + interimText;
   };
 
   recognition.onerror = (event) => {
-    document.getElementById("mic-status").textContent = "Mic error: " + event.error;
-    stopMic();
+    if (statusEl) statusEl.textContent = "Mic error: " + event.error;
+    stop();
   };
 
   recognition.onend = () => {
-    if (recognizing) stopMic();
+    if (listening) stop();
   };
-}
 
-function toggleMic() {
-  if (!recognition) return;
-  if (recognizing) stopMic();
-  else startMic();
-}
+  function start() {
+    listening = true;
+    btn.classList.add("recording");
+    if (statusEl) statusEl.textContent = "Listening… tap again to stop.";
+    recognition.start();
+  }
 
-function startMic() {
-  recognizing = true;
-  document.getElementById("mic-btn").classList.add("recording");
-  document.getElementById("mic-status").textContent = "Listening… tap again to stop.";
-  recognition.start();
-}
+  function stop() {
+    listening = false;
+    btn.classList.remove("recording");
+    if (statusEl) statusEl.textContent = idleStatusText;
+    try { recognition.stop(); } catch (e) {}
+  }
 
-function stopMic() {
-  recognizing = false;
-  document.getElementById("mic-btn").classList.remove("recording");
-  document.getElementById("mic-status").textContent = "Tap the mic and speak — you can edit the text after.";
-  try { recognition.stop(); } catch (e) {}
+  btn.addEventListener("click", () => (listening ? stop() : start()));
 }
 
 async function submitEntry() {
@@ -275,7 +279,8 @@ async function loadRecentEntries() {
   profileCtx = result;
   document.getElementById("org-label").textContent = result.profile.organizations?.name ?? "";
   document.getElementById("entry-date").value = new Date().toISOString().slice(0, 10);
-  setupSpeechRecognition();
+  setupDictation("transcript", "mic-btn", "mic-status", "Tap the mic and speak — you can edit the text after.");
+  setupDictation("title", "title-mic-btn", null, null);
   loadRecentEntries();
 })();
 </script>
