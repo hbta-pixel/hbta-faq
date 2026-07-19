@@ -4,7 +4,7 @@
 const ENTRY_TYPES = {
   vet_pd: { label: "VET Professional Development", short: "VET PD" },
   vocational_pd: { label: "Vocational PD", short: "Vocational PD" },
-  industry_engagement: { label: "Industry Engagement", short: "Industry" },
+  industry_engagement: { label: "Industry Engagement", short: "Industry Engagement" },
 };
 
 function configLooksUnset() {
