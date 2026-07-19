@@ -44,7 +44,9 @@ language sql stable security definer set search_path = public as $$
   select org_id from profiles where id = auth.uid()
 $$;
 
-create or replace function public.current_role()
+-- Note: named current_user_role(), not current_role() — "current_role" is a
+-- reserved SQL keyword (like current_user) and cannot be used as a function name.
+create or replace function public.current_user_role()
 returns text
 language sql stable security definer set search_path = public as $$
   select role from profiles where id = auth.uid()
@@ -74,7 +76,7 @@ drop policy if exists "profiles select" on profiles;
 create policy "profiles select" on profiles
   for select to authenticated using (
     id = auth.uid()
-    or (current_role() = 'admin' and org_id = current_org_id())
+    or (current_user_role() = 'admin' and org_id = current_org_id())
   );
 
 drop policy if exists "profiles update own" on profiles;
@@ -92,7 +94,7 @@ drop policy if exists "entries select" on pd_entries;
 create policy "entries select" on pd_entries
   for select to authenticated using (
     staff_id = auth.uid()
-    or (current_role() = 'admin' and org_id = current_org_id())
+    or (current_user_role() = 'admin' and org_id = current_org_id())
   );
 
 -- Storage bucket for evidence photos.
