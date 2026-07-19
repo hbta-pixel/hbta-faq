@@ -57,15 +57,17 @@ alter table organizations enable row level security;
 alter table profiles enable row level security;
 alter table pd_entries enable row level security;
 
--- organizations: any signed-in user can create one (becomes its admin) and can look
--- up org name/invite_code (needed so a trainer can validate an invite code at signup).
+-- organizations: any signed-in user can create one (becomes its admin). Read access
+-- (name + invite_code only, via the columns the app selects) is open to signed-out
+-- visitors too, because a trainer must be able to validate an invite code *before*
+-- they have an account yet.
 drop policy if exists "orgs insert" on organizations;
 create policy "orgs insert" on organizations
   for insert to authenticated with check (true);
 
 drop policy if exists "orgs select" on organizations;
 create policy "orgs select" on organizations
-  for select to authenticated using (true);
+  for select to anon, authenticated using (true);
 
 -- profiles: users manage their own row; admins can see every profile in their org.
 drop policy if exists "profiles insert own" on profiles;
