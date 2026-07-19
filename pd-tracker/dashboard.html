@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PD Tracker | Dashboard</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#00A599">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div>
+    <h1>PD Tracker</h1>
+    <div class="sub" id="org-label">&nbsp;</div>
+  </div>
+  <button class="link" onclick="signOut()">Log out</button>
+</header>
+
+<main class="container wide">
+
+  <div class="card">
+    <h3>Invite your trainers</h3>
+    <p class="hint">Share this code — trainers enter it when they sign up in the app.</p>
+    <span class="invite-code" id="invite-code">——</span>
+  </div>
+
+  <div class="stat-row" id="stat-row"></div>
+
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <h3 style="margin-bottom:0">Live activity</h3>
+      <button class="btn btn-outline" onclick="exportCSV()">Download CSV</button>
+    </div>
+
+    <div class="filters" style="margin-top:16px">
+      <select id="filter-staff"><option value="">All staff</option></select>
+      <select id="filter-type">
+        <option value="">All types</option>
+        <option value="vet_pd">VET PD</option>
+        <option value="vocational_pd">Vocational PD</option>
+        <option value="industry_engagement">Industry Engagement</option>
+      </select>
+      <input type="date" id="filter-from">
+      <input type="date" id="filter-to">
+      <button class="btn btn-outline" onclick="loadEntries()">Filter</button>
+    </div>
+
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr><th>Staff</th><th>Type</th><th>Date</th><th>Title</th><th>Details</th><th>Evidence</th><th>Submitted</th></tr>
+        </thead>
+        <tbody id="entries-body"></tbody>
+      </table>
+      <div id="entries-empty" class="empty-state" style="display:none">No entries match these filters yet.</div>
+    </div>
+  </div>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+let profileCtx = null;
+let staffById = {};
+let currentEntries = [];
+
+async function loadStaff() {
+  const { data, error } = await db
+    .from("profiles")
+    .select("id, full_name")
+    .eq("org_id", profileCtx.profile.org_id)
+    .order("full_name");
+  if (error) return;
+  staffById = Object.fromEntries(data.map((s) => [s.id, s.full_name]));
+  const select = document.getElementById("filter-staff");
+  select.innerHTML =
+    '<option value="">All staff</option>' +
+    data.map((s) => `<option value="${s.id}">${escapeHtml(s.full_name)}</option>`).join("");
+}
+
+async function loadEntries() {
+  let query = db
+    .from("pd_entries")
+    .select("*")
+    .eq("org_id", profileCtx.profile.org_id)
+    .order("created_at", { ascending: false });
+
+  const staffFilter = document.getElementById("filter-staff").value;
+  const typeFilter = document.getElementById("filter-type").value;
+  const fromFilter = document.getElementById("filter-from").value;
+  const toFilter = document.getElementById("filter-to").value;
+
+  if (staffFilter) query = query.eq("staff_id", staffFilter);
+  if (typeFilter) query = query.eq("entry_type", typeFilter);
+  if (fromFilter) query = query.gte("entry_date", fromFilter);
+  if (toFilter) query = query.lte("entry_date", toFilter);
+
+  const { data, error } = await query.limit(500);
+  if (error) return;
+  currentEntries = data;
+  renderEntries(data);
+  renderStats(data);
+}
+
+function renderEntries(data) {
+  const body = document.getElementById("entries-body");
+  const empty = document.getElementById("entries-empty");
+  if (!data.length) {
+    body.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  body.innerHTML = data
+    .map((e) => {
+      const staffName = staffById[e.staff_id] ?? "Unknown";
+      const details = [e.contact_name ? `With: ${escapeHtml(e.contact_name)}` : "", escapeHtml(e.transcript ?? "")]
+        .filter(Boolean)
+        .join("<br>");
+      return `<tr>
+        <td>${escapeHtml(staffName)}</td>
+        <td><span class="badge ${e.entry_type}">${ENTRY_TYPES[e.entry_type].short}</span></td>
+        <td>${e.entry_date}</td>
+        <td>${escapeHtml(e.title ?? "")}</td>
+        <td>${details}</td>
+        <td>${e.photo_url ? `<a href="${e.photo_url}" target="_blank">Photo</a>` : "—"}</td>
+        <td>${formatDateTime(e.created_at)}</td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function renderStats(data) {
+  const counts = { vet_pd: 0, vocational_pd: 0, industry_engagement: 0 };
+  data.forEach((e) => { if (counts[e.entry_type] !== undefined) counts[e.entry_type]++; });
+  const staffCount = new Set(data.map((e) => e.staff_id)).size;
+  document.getElementById("stat-row").innerHTML = `
+    <div class="stat-card"><div class="num">${data.length}</div><div class="label">Total entries</div></div>
+    <div class="stat-card"><div class="num">${counts.vet_pd}</div><div class="label">VET PD</div></div>
+    <div class="stat-card"><div class="num">${counts.vocational_pd}</div><div class="label">Vocational PD</div></div>
+    <div class="stat-card"><div class="num">${counts.industry_engagement}</div><div class="label">Industry Engagement</div></div>
+    <div class="stat-card"><div class="num">${staffCount}</div><div class="label">Active staff</div></div>
+  `;
+}
+
+function exportCSV() {
+  const rows = currentEntries.map((e) => ({ ...e, staff_name: staffById[e.staff_id] ?? "Unknown" }));
+  downloadText(`pd-tracker-export-${new Date().toISOString().slice(0, 10)}.csv`, toCSV(rows));
+}
+
+function subscribeRealtime() {
+  db.channel("pd_entries_live")
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "pd_entries", filter: `org_id=eq.${profileCtx.profile.org_id}` },
+      () => loadEntries()
+    )
+    .subscribe();
+}
+
+(async () => {
+  const result = await requireAuth("admin");
+  if (!result) return;
+  profileCtx = result;
+  document.getElementById("org-label").textContent = result.profile.organizations?.name ?? "";
+  document.getElementById("invite-code").textContent = result.profile.organizations?.invite_code ?? "——";
+  await loadStaff();
+  await loadEntries();
+  subscribeRealtime();
+})();
+</script>
+</body>
+</html>
