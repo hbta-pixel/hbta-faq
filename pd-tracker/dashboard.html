@@ -58,6 +58,35 @@
     </div>
   </div>
 
+  <div class="card">
+    <h3>Scheduled email reports</h3>
+    <p class="hint">
+      Have the CSV report emailed to you automatically on a recurring basis, instead of
+      downloading it manually. <strong>Note:</strong> automatic sending isn't switched on yet —
+      saving here just records your preference for when it is.
+    </p>
+
+    <label for="report-email">Send reports to</label>
+    <input type="email" id="report-email" placeholder="you@example.com">
+
+    <label for="report-frequency">How often</label>
+    <select id="report-frequency">
+      <option value="weekly">Weekly</option>
+      <option value="fortnightly">Fortnightly</option>
+      <option value="monthly">Monthly</option>
+    </select>
+
+    <label style="display:flex; align-items:center; gap:8px; margin-top:14px;">
+      <input type="checkbox" id="report-enabled" style="width:auto" checked>
+      Enabled
+    </label>
+
+    <div id="report-error"></div>
+    <div id="report-success"></div>
+    <button class="btn btn-primary" style="margin-top:16px" onclick="saveReportSchedule()">Save preference</button>
+    <p class="hint" id="report-status" style="margin-top:14px; margin-bottom:0"></p>
+  </div>
+
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -160,6 +189,56 @@ function exportCSV() {
   downloadText(`pd-tracker-export-${new Date().toISOString().slice(0, 10)}.csv`, toCSV(rows));
 }
 
+const FREQUENCY_LABELS = { weekly: "Weekly", fortnightly: "Fortnightly", monthly: "Monthly" };
+
+async function loadReportSchedule() {
+  const { data, error } = await db
+    .from("report_schedules")
+    .select("*")
+    .eq("org_id", profileCtx.profile.org_id)
+    .maybeSingle();
+
+  if (error || !data) {
+    document.getElementById("report-email").value = profileCtx.session.user.email ?? "";
+    document.getElementById("report-status").textContent = "No report schedule set up yet.";
+    return;
+  }
+
+  document.getElementById("report-email").value = data.recipient_email;
+  document.getElementById("report-frequency").value = data.frequency;
+  document.getElementById("report-enabled").checked = data.enabled;
+  const lastSent = data.last_sent_at ? formatDateTime(data.last_sent_at) : "Never yet";
+  document.getElementById("report-status").textContent =
+    `${FREQUENCY_LABELS[data.frequency]} · ${data.enabled ? "Enabled" : "Disabled"} · Last sent: ${lastSent}`;
+}
+
+async function saveReportSchedule() {
+  showReportMessage("");
+  const email = document.getElementById("report-email").value.trim();
+  const frequency = document.getElementById("report-frequency").value;
+  const enabled = document.getElementById("report-enabled").checked;
+  if (!email) return showReportMessage("Enter an email address.", true);
+
+  const { error } = await db.from("report_schedules").upsert(
+    {
+      org_id: profileCtx.profile.org_id,
+      recipient_email: email,
+      frequency,
+      enabled,
+    },
+    { onConflict: "org_id" }
+  );
+  if (error) return showReportMessage(error.message, true);
+
+  showReportMessage("Saved.", false, true);
+  loadReportSchedule();
+}
+
+function showReportMessage(message, isError, isSuccess) {
+  document.getElementById("report-error").innerHTML = isError && message ? `<div class="error">${message}</div>` : "";
+  document.getElementById("report-success").innerHTML = isSuccess && message ? `<div class="success">${message}</div>` : "";
+}
+
 function subscribeRealtime() {
   db.channel("pd_entries_live")
     .on(
@@ -178,6 +257,7 @@ function subscribeRealtime() {
   document.getElementById("invite-code").textContent = result.profile.organizations?.invite_code ?? "——";
   await loadStaff();
   await loadEntries();
+  await loadReportSchedule();
   subscribeRealtime();
 })();
 </script>
