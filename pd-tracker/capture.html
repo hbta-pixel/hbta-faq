@@ -77,7 +77,23 @@
   </div>
 
   <div class="card">
-    <h3>Your recent entries</h3>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <h3 style="margin-bottom:0">Your entries</h3>
+      <button class="btn btn-outline" onclick="exportMyCSV()">Download CSV</button>
+    </div>
+
+    <div class="filters" style="margin-top:16px">
+      <select id="my-filter-type" onchange="loadRecentEntries()">
+        <option value="">All types</option>
+        <option value="vet_pd">VET PD</option>
+        <option value="vocational_pd">Vocational PD</option>
+        <option value="industry_engagement">Industry Engagement</option>
+      </select>
+      <input type="date" id="my-filter-from" onchange="loadRecentEntries()">
+      <input type="date" id="my-filter-to" onchange="loadRecentEntries()">
+      <button class="btn btn-outline" onclick="clearMyFilters()">Clear filters</button>
+    </div>
+
     <div id="recent-list"><div class="empty-state">Loading…</div></div>
   </div>
 
@@ -245,19 +261,38 @@ function showSubmitMessage(message, isError, isSuccess) {
   document.getElementById("submit-success").innerHTML = isSuccess && message ? `<div class="success">${message}</div>` : "";
 }
 
+let myEntries = [];
+
+function clearMyFilters() {
+  document.getElementById("my-filter-type").value = "";
+  document.getElementById("my-filter-from").value = "";
+  document.getElementById("my-filter-to").value = "";
+  loadRecentEntries();
+}
+
 async function loadRecentEntries() {
-  const { data, error } = await db
+  let query = db
     .from("pd_entries")
     .select("*")
     .eq("staff_id", profileCtx.session.user.id)
-    .order("created_at", { ascending: false })
-    .limit(15);
+    .order("created_at", { ascending: false });
+
+  const typeFilter = document.getElementById("my-filter-type").value;
+  const fromFilter = document.getElementById("my-filter-from").value;
+  const toFilter = document.getElementById("my-filter-to").value;
+
+  if (typeFilter) query = query.eq("entry_type", typeFilter);
+  if (fromFilter) query = query.gte("entry_date", fromFilter);
+  if (toFilter) query = query.lte("entry_date", toFilter);
+
+  const { data, error } = await query.limit(500);
 
   const container = document.getElementById("recent-list");
   if (error) {
     container.innerHTML = `<div class="error">${error.message}</div>`;
     return;
   }
+  myEntries = data;
   if (!data.length) {
     container.innerHTML = '<div class="empty-state">Nothing logged yet — your first entry will show up here.</div>';
     return;
@@ -276,6 +311,11 @@ async function loadRecentEntries() {
     </div>`
     )
     .join("");
+}
+
+function exportMyCSV() {
+  const rows = myEntries.map((e) => ({ ...e, staff_name: profileCtx.profile.full_name }));
+  downloadText(`my-pd-entries-${new Date().toISOString().slice(0, 10)}.csv`, toCSV(rows));
 }
 
 (async () => {
