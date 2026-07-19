@@ -99,6 +99,31 @@ create policy "entries select" on pd_entries
     or (current_user_role() = 'admin' and org_id = current_org_id())
   );
 
+-- One row per org: admin's preference for a recurring emailed CSV report.
+-- Note: saving a row here only records the preference. Actually emailing the
+-- report requires a separate scheduled job (Supabase Edge Function + cron)
+-- that is not part of this schema yet.
+create table if not exists report_schedules (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null unique references organizations(id) on delete cascade,
+  recipient_email text not null,
+  frequency text not null check (frequency in ('weekly', 'fortnightly', 'monthly')),
+  enabled boolean not null default true,
+  last_sent_at timestamptz,
+  next_run_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+alter table report_schedules enable row level security;
+
+drop policy if exists "report_schedules admin manage" on report_schedules;
+create policy "report_schedules admin manage" on report_schedules
+  for all to authenticated using (
+    current_user_role() = 'admin' and org_id = current_org_id()
+  ) with check (
+    current_user_role() = 'admin' and org_id = current_org_id()
+  );
+
 -- Storage bucket for evidence photos.
 insert into storage.buckets (id, name, public)
 values ('pd-photos', 'pd-photos', true)
