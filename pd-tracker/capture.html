@@ -42,6 +42,7 @@
         <button type="button" class="mic-btn mic-btn-sm" id="title-mic-btn">🎤</button>
         <input type="text" id="title" placeholder="e.g. Assessment Validation Webinar" style="flex:1">
       </div>
+      <div class="mic-status" id="title-mic-status"></div>
 
       <div id="contact-field" style="display:none">
         <label for="contact-name">Who did you speak with / engage with?</label>
@@ -142,7 +143,16 @@ function setupDictation(fieldId, buttonId, statusId, idleStatusText) {
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
-    if (statusEl) statusEl.textContent = "Voice input isn't supported in this browser — just type instead.";
+    // Notably: Safari on iPhone (and any browser on iPhone, which all use Safari's
+    // engine) doesn't support this API at all — there's no fixing that from here.
+    // iOS has its own dictation mic built into the keyboard, so point people at that.
+    if (statusEl) {
+      statusEl.textContent =
+        "This browser doesn't support in-app dictation. On iPhone: tap into the field, " +
+        "then tap the microphone icon on your keyboard to dictate instead.";
+    }
+    btn.title = "Not supported in this browser — use your keyboard's dictation mic instead";
+    btn.style.opacity = "0.4";
     btn.disabled = true;
     return;
   }
@@ -325,7 +335,7 @@ function exportMyCSV() {
   document.getElementById("org-label").textContent = result.profile.organizations?.name ?? "";
   document.getElementById("entry-date").value = new Date().toISOString().slice(0, 10);
   setupDictation("transcript", "mic-btn", "mic-status", "Tap the mic and speak — you can edit the text after.");
-  setupDictation("title", "title-mic-btn", null, null);
+  setupDictation("title", "title-mic-btn", "title-mic-status", "");
   loadRecentEntries();
 })();
 </script>
