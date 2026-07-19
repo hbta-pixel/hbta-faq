@@ -61,9 +61,9 @@
       <label>Photo evidence (optional)</label>
       <div class="photo-row">
         <button type="button" class="btn btn-outline" onclick="document.getElementById('camera-input').click()">📷 Take photo</button>
-        <button type="button" class="btn btn-outline" onclick="document.getElementById('upload-input').click()">🖼️ Upload photo</button>
-        <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none" onchange="onPhotoSelected(event)">
-        <input type="file" id="upload-input" accept="image/*" style="display:none" onchange="onPhotoSelected(event)">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('upload-input').click()">🖼️ Upload Evidence</button>
+        <input type="file" id="camera-input" class="file-input-hidden" accept="image/*" capture="environment" onchange="onPhotoSelected(event)">
+        <input type="file" id="upload-input" class="file-input-hidden" accept="image/*" onchange="onPhotoSelected(event)">
       </div>
       <div class="photo-row" id="photo-preview-row" style="display:none">
         <img id="photo-preview" class="photo-preview">
