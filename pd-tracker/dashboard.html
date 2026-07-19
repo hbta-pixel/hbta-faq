@@ -35,16 +35,16 @@
     </div>
 
     <div class="filters" style="margin-top:16px">
-      <select id="filter-staff"><option value="">All staff</option></select>
-      <select id="filter-type">
+      <select id="filter-staff" onchange="loadEntries()"><option value="">All staff</option></select>
+      <select id="filter-type" onchange="loadEntries()">
         <option value="">All types</option>
         <option value="vet_pd">VET PD</option>
         <option value="vocational_pd">Vocational PD</option>
         <option value="industry_engagement">Industry Engagement</option>
       </select>
-      <input type="date" id="filter-from">
-      <input type="date" id="filter-to">
-      <button class="btn btn-outline" onclick="loadEntries()">Filter</button>
+      <input type="date" id="filter-from" onchange="loadEntries()">
+      <input type="date" id="filter-to" onchange="loadEntries()">
+      <button class="btn btn-outline" onclick="clearFilters()">Clear filters</button>
     </div>
 
     <div style="overflow-x:auto">
@@ -80,6 +80,14 @@ async function loadStaff() {
   select.innerHTML =
     '<option value="">All staff</option>' +
     data.map((s) => `<option value="${s.id}">${escapeHtml(s.full_name)}</option>`).join("");
+}
+
+function clearFilters() {
+  document.getElementById("filter-staff").value = "";
+  document.getElementById("filter-type").value = "";
+  document.getElementById("filter-from").value = "";
+  document.getElementById("filter-to").value = "";
+  loadEntries();
 }
 
 async function loadEntries() {
